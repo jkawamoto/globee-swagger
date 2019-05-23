@@ -1,0 +1,585 @@
+swagger: "2.0"
+info:
+  title: Globee Payment API
+  version: "1.0"
+host: globee.com
+basePath: /payment-api/v1
+schemes:
+  - https
+tags:
+  - name: Ping
+    description: |
+      This endpoint is used as a test endpoint for the user to verify that the integration and authentication is done correctly.
+  - name: Payment Request
+    description: |
+      Payment requests are resources used to handle payments, as part of the payment process in an e-commerce checkout flow.
+
+      On the merchant website, when a user checks out and selects the option to pay with Globee,
+      the system needs to create a new payment-request that the user will pay on.
+      The response will contain a redirect url to which the user needs to be redirected in order to make payment.
+      Once the payment has been received, the user will be redirected back to the success url if it was set when the payment-request was created.
+
+      A cancel url can also be set to redirect the user back to the checkout screen if the user decides not to pay using Globee.
+  - name: Payment Methods
+    description: |
+      This returns the merchant account's accepted crypto-currencies.
+  - name: Payment Details
+    description: |
+      This returns the payment details that has already been assigned to the payment request.
+      Optionally the currency id could be provided to only return the details for that currency.
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /ping:
+    get:
+      tags:
+        - Ping
+      summary: Returns the merchant name and URL
+      description: |
+        Returns the merchant name and URL in order for the user to validate that the authorization has been setup correctly.
+      operationId: ping
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: The merchant name.
+                    example: Globee
+                  url:
+                    type: string
+                    description: The URL of the merchant.
+                    example: http://globee.com
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /payment-request:
+    post:
+      tags:
+        - Payment Request
+      summary: Creates a new payment request.
+      description: |
+        Creates a new payment request. On a successful request,
+        the user has to be redirected to the redirect_url contained in the response in order to complete the payment process.
+        A payment request will only be valid for 15 minutes after it was created.
+      operationId: createRequest
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: payment
+          in: body
+          description: A payment request
+          schema:
+            type: object
+            required:
+              - total
+              - customer
+            properties:
+              total:
+                type: number
+                description: The total amount in the invoice currency.
+                example: 123.45
+              currency:
+                type: string
+                description: ISO 4217 currency codes (eg. USD), including BTC (Bitcoin) and XMR (Monero). Defaults to USD.
+                example: USD
+              custom_payment_id:
+                type: string
+                description: A reference or custom identifier that you can use to link the payment back to your system.
+                example: "742"
+              callback_data:
+                type: string
+                description: Passthrough data that will be returned in the IPN callback.
+                example: example data
+              customer:
+                $ref: "#/definitions/Customer"
+              success_url:
+                type: string
+                description: A URL to direct the user to after a successful payment has been made.
+                example: https://www.example.com/success
+              cancel_url:
+                type: string
+                description: A URL to direct the user to if they decide to cancel the payment request.
+                example: https://www.example.com/cancel
+              ipn_url:
+                type: string
+                description: |
+                  The URL for the Instant Payment Notification callback to notify your site of updates on the payment-request,
+                  like status changes. Please note this does not follow redirects.
+                example: https://www.example.com/globee/ipn-callback
+              notification_email:
+                type: string
+                description: An email address that the system wil send a notification email to once the payment has been confirmed.
+                example: payment@example.com
+              confirmation_speed:
+                type: string
+                description: |
+                  The amount of confirmations required before changing the status to confirmed.
+                  Possible options are "low", "medium" or "high".
+                  High requires the least amount of confirmations, think high speed, high risk,
+                  where low requires the maximum amount of confirmations. Defaults to "medium".
+                example: medium
+              custom_store_reference:
+                type: string
+                description: A custom store reference
+                example: abc
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: "#/definitions/Payment"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /payment-request/{payment_id}:
+    get:
+      tags:
+        - Payment Request
+      summary: Fetches a previously created payment request by payment_id.
+      description: |
+        Fetches a previously created payment request by payment_id.
+      operationId: getRequest
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: payment_id
+          description: The payment request ID
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: "#/definitions/Payment"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+    put:
+      tags:
+        - Payment Request
+      summary: Updates an existing payment request.
+      description: |
+        Updates an existing payment request. Only the parameters listed below can be updated.
+      operationId: updateRequest
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: payment_id
+          description: The payment request ID
+          in: path
+          type: string
+          required: true
+        - name: payment
+          in: body
+          description: The updating request parameters.
+          schema:
+            type: object
+            required:
+              - customer
+            properties:
+              custom_payment_id:
+                type: string
+                description: A reference or custom identifier that you can use to link the payment back to your system.
+                example: "742"
+              callback_data:
+                type: string
+                description: Passthrough data that will be returned in the IPN callback.
+                example: example data
+              customer:
+                $ref: "#/definitions/Customer"
+              custom_store_reference:
+                type: string
+                description: A custom store reference
+                example: abc
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: "#/definitions/Payment"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /account/payment-methods:
+    get:
+      tags:
+        - Payment Methods
+      summary: Returns the accepted crypto-currencies for your merchant.
+      description: |
+        Returns the accepted crypto-currencies for your merchant.
+      operationId: listMethods
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: ID of the payment method
+                      example: BTC
+                    name:
+                      type: string
+                      description: Name of the payment method
+                      example: Bitcoin
+                    enabled:
+                      type: boolean
+                      description: True if the payment method is enabled
+                      example: true
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /payment-request/{id}/payment-methods:
+    get:
+      tags:
+        - Payment Details
+      summary: Returns the accepted crypto-currencies and associated address information.
+      description: |
+        Returns the accepted crypto-currencies and associated address information for the payment-request associated with the given id.
+        If no addresses has been assigned yet, the 'extra' field will be null.
+      operationId: getDetail
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: id
+          description: The payment id that identifies the payment request.
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: ID of the payment method
+                      example: BTC
+                    name:
+                      type: string
+                      description: Name of the payment method
+                      example: Bitcoin
+                    enabled:
+                      type: boolean
+                      description: True if the payment method is enabled
+                      example: true
+                    addresses:
+                      type: object
+                      properties:
+                        success:
+                          type: boolean
+                          example: true
+                        data:
+                          type: array
+                          items:
+                            $ref: "#/definitions/PaymentDetail"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /payment-request/{id}/addresses/{currency_id}/:
+    get:
+      tags:
+        - Payment Details
+      summary: Generates and returns the payment details.
+      description: |
+        Generates and returns the payment details for a given payment request and payment currency.
+      operationId: createPaymentDetail
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: id
+          description: The payment id that identifies the payment request.
+          in: path
+          type: string
+          required: true
+        - name: currency_id
+          description: One of the currency id's BTC, XMR, LTC, DOGE, ETH, XRP etc.
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: "#/definitions/PaymentDetail"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+  /payment-request/{id}/addresses/{currency_id}/{address_id}:
+    get:
+      tags:
+        - Payment Details
+      summary: Generates and returns the payment details.
+      description: |
+        Generates and returns the payment details for a given payment request and payment currency.
+      operationId: createPaymentDetailWithAddressID
+      parameters:
+        - name: X-AUTH-KEY
+          description: authorization key
+          in: header
+          type: string
+        - name: id
+          description: The payment id that identifies the payment request.
+          in: path
+          type: string
+          required: true
+        - name: currency_id
+          description: One of the currency id's BTC, XMR, LTC, DOGE, ETH, XRP etc.
+          in: path
+          type: string
+          required: true
+        - name: address_id
+          description: The address id if it has been assigned. Examples 'default', 'lightning_address'.
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: Success Response
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: "#/definitions/PaymentDetail"
+        default:
+          description: Error Response
+          schema:
+            $ref: "#/definitions/StandardError"
+definitions:
+  Customer:
+    type: object
+    description: Customer information
+    properties:
+      name:
+        type: string
+        description: The name of your customer making the payment
+        example: John Smit
+      email:
+        type: string
+        description: The email address of your customer making the payment.
+        example: john.smit@hotmail.com
+  Payment:
+    type: object
+    properties:
+      id:
+        type: string
+        description: The ID of this payment request
+        example: a1B2c3D4e5F6g7H8i9J0kL
+      status:
+        type: string
+        description: The payment status
+        example: unpaid
+      adjusted_total:
+        type: number
+        description: The adjusted invoice total after accepted under/over payments are applied.
+      payment_details:
+        type: object
+        properties:
+          currency:
+            type: string
+            description: The method used to make payment, e.g. BTC, XMR, LTC etc.
+          received_amount:
+            type: number
+            description: The amount paid by the customer in the invoice currency.
+          received_difference:
+            type: number
+            description: The difference between the initial amount requested, and the amount paid by the customer in the invoice currency.
+      redirect_url:
+        type: string
+        description: The URL to redirect the client to in order to make payment.
+        example: http://globee.com/invoice/a1B2c3D4e5F6g7H8i9J0kL
+      expires_at:
+        type: string
+        format: date-time
+        example: 2018-01-25 12:31:04
+      created_at:
+        type: string
+        format: date-time
+        example: 2018-01-25 12:16:04
+      total:
+        type: number
+        description: The total amount in the invoice currency.
+        example: 123.45
+      currency:
+        type: string
+        description: ISO 4217 currency codes (eg. USD), including BTC (Bitcoin) and XMR (Monero). Defaults to USD.
+        example: USD
+      custom_payment_id:
+        type: string
+        description: A reference or custom identifier that you can use to link the payment back to your system.
+        example: "742"
+      callback_data:
+        type: string
+        description: Passthrough data that will be returned in the IPN callback.
+        example: example data
+      customer:
+        $ref: "#/definitions/Customer"
+      success_url:
+        type: string
+        description: A URL to direct the user to after a successful payment has been made.
+        example: https://www.example.com/success
+      cancel_url:
+        type: string
+        description: A URL to direct the user to if they decide to cancel the payment request.
+        example: https://www.example.com/cancel
+      ipn_url:
+        type: string
+        description: |
+          The URL for the Instant Payment Notification callback to notify your site of updates on the payment-request,
+          like status changes. Please note this does not follow redirects.
+        example: https://www.example.com/globee/ipn-callback
+      notification_email:
+        type: string
+        description: An email address that the system wil send a notification email to once the payment has been confirmed.
+        example: payment@example.com
+      confirmation_speed:
+        type: string
+        description: |
+          The amount of confirmations required before changing the status to confirmed.
+          Possible options are "low", "medium" or "high".
+          High requires the least amount of confirmations, think high speed, high risk,
+          where low requires the maximum amount of confirmations. Defaults to "medium".
+        example: medium
+      custom_store_reference:
+        type: string
+        description: A custom store reference
+        example: abc
+  PaymentDetail:
+    type: object
+    properties:
+      id:
+        type: string
+        example: default
+      title:
+        type: string
+        example: Lightning Payment Request
+      description:
+        type: string
+        example: Pay using the Lightning Network
+      currency:
+        type: string
+        example: BTC
+      extra:
+        type: object
+        properties:
+          amount:
+            type: number
+            example: 0.002089
+          address:
+            type: string
+            example: lntb2089u1pdcsrrapp58dm644j0vwm5n2vvfjr2f97uln8dv6ajtm9vaswmjhffyrqk3jpsdq2gakx7sn9v5cqzysxqzuy9uvhyxxkh9whz0m4n6kx9zpe9f9hrxqv7sg3maeh8gvs3mep6lnnclxwkej3vamfzcdhx5kq0lat9vu8ulm7nzdnr44gtzuh6sjrrxsphghnpm
+          qr_code:
+            type: string
+            example: lntb2089u1pdcsrrapp58dm644j0vwm5n2vvfjr2f97uln8dv6ajtm9vaswmjhffyrqk3jpsdq2gakx7sn9v5cqzysxqzuy9uvhyxxkh9whz0m4n6kx9zpe9f9hrxqv7sg3maeh8gvs3mep6lnnclxwkej3vamfzcdhx5kq0lat9vu8ulm7nzdnr44gtzuh6sjrrxsphghnpm
+          ttl:
+            type: integer
+            example: 900
+      link:
+        type: string
+        example: /payment-request/2LPzpGjbxdqJbqmw6RZynN/addresses/LNBT/default
+  StandardError:
+    type: object
+    properties:
+      success:
+        type: boolean
+        example: false
+      errors:
+        type: array
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+              example: below_minimum
+            field:
+              type: string
+              example: total
+            message:
+              type: string
+              example: The total must be at least 10.
+            extra:
+              type: array
+              items:
+                type: string
+                example: "10"
