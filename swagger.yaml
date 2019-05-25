@@ -451,7 +451,7 @@ definitions:
         description: The payment status
         example: unpaid
       adjusted_total:
-        type: number
+        type: string
         description: The adjusted invoice total after accepted under/over payments are applied.
       payment_details:
         type: object
@@ -476,9 +476,9 @@ definitions:
         type: string
         example: 2018-01-25 12:16:04
       total:
-        type: number
+        type: string
         description: The total amount in the invoice currency.
-        example: 123.45
+        example: "123.45"
       currency:
         type: string
         description: ISO 4217 currency codes (eg. USD), including BTC (Bitcoin) and XMR (Monero). Defaults to USD.
